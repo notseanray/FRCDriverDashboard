@@ -7,39 +7,59 @@
 
   const webview = new WebviewWindow('main')
   let new_ip = "";
+  let active = true;
   let init = false;
   let data = "";
+  let timestamp = Date.now();
+  let connected = false;
+  let rotation = 0;
 
   let flywheelcolor = "badred";
-  let flywheel_rpm = 0;
+  let flywheel_temp = 0.0;
+  let flywheel_temp_f = 0.0;
+  let flywheel_rpm = 0.0;
 
   onMount(async () => {
       // default ip
       appWindow.emit('set_ip', { message: '10.10.2.2:1735' })
       appWindow.listen('new_data', (e) => {
+        if (!active) return;
         data = e.payload;
         const rpm = data.flywheel_rpm;
-        flywheel_rpm = rpm;
+        let new_rotation = data.rotation_2d;
+        if (new_rotation > 360) {
+            new_rotation = new_rotation - Math.floor(new_rotation / 360) * 360;
+        }
+        rotation = new_rotation;
         if (rpm != undefined) {
-            if (rpm >= 6000) {
+            flywheel_temp_f = (data.flywheel_temp * 1.8 + 32).toFixed(1);
+            flywheel_temp = data.flywheel_temp.toFixed(1);
+            flywheel_rpm = rpm.toFixed(1);
+            connected = true;
+            timestamp = Date.now();
+            if (rpm >= 5000) {
                 flywheelcolor = "fuckcolor";
             }
-            else if (rpm >= 4000) {
+            else if (rpm >= 2800) {
                 flywheelcolor = "goodgreen";
-            } else if (rpm >= 3000) {
+            } else if (rpm >= 1800) {
                 flywheelcolor = "midyellow";
             } else {
                 flywheelcolor = "badred";
             }
         }
       })
-      // webview.listen('new_data', (e) => {
-      //   console.log(e.payload)
-      // })
       invoke("init_process", { window: webview, ip: '' }).then(() => {
           init = true;
       });
-    console.log("test")
+      setInterval(() => {
+        if (Date.now() - timestamp > 2000) {
+            connected = false;
+        }
+        if (!active) {
+            data = {};
+        }
+      }, 1000);
   })
 
   // emits the `click` event with the object payload
@@ -48,37 +68,106 @@
 <br />
 
 <div class="flywheelsection">
-    RPM: {flywheel_rpm <= 0 ? flywheel_rpm + " BAD BAD" : flywheel_rpm}
-    <div class={"flywheelindicator " + flywheelcolor} />
+    RPM: {flywheel_rpm <= 0.0 ? flywheel_rpm + " BAD BAD" : flywheel_rpm}
+    <div class={"flywheelindicator " + flywheelcolor}>
+    h
+    </div>
+    <br />
+    TEMP: {flywheel_temp} C {flywheel_temp_f} F
 </div>
 
 <div class="climberindicator">
-    FORWARD SOLENOID
+    SOLENOID1 DOWN
     <br />
     <div class={"climberbox " + (data.forward_solenoid ? "goodgreen" : "badred")}>
         f
     </div>
-    REVERSE SOLENOID
+    SOLENOID2 DOWN
     <br />
     <div class={"climberbox " + (data.reverse_solenoid ? "goodgreen" : "badred")}>
         r
     </div>
 </div>
 <div class="compressorindicator">
-    COMPRESSOR ACTIVE
+    COMPRESSOR
     <div class={"compressorbox " + (data.compressor_enabled ? "goodgreen" : "badred")}>
     h
     </div>
-    COMPRESSOR CURRENT: {data.compressor_current == undefined ? 0 : data.compressor_current}
+    COMPRESSOR CURRENT:
+    <br />
+    {data.compressor_current == undefined ? 0.0 : data.compressor_current.toFixed(2)}
+    <br />
+    COMPRESSOR VOLTAGE:
+    <!-- <br /> -->
+    <!-- {data.compressor_voltage == undefined ? 0.0 : data.compressor_voltage.toFixed(2)} -->
+</div>
+<div class="motorindicator">
+    FRONT LEFT voltage:
+    <br />
+    {data.left_front_voltage == undefined ? 0.0 : data.left_front_voltage.toFixed(2)}
+    <div class={"climberbox " + (data.left_front_voltage > 2 ? "goodgreen" : "badred")}>
+        r
+    </div>
+    BACK LEFT voltage:
+    <br />
+    {data.left_back_voltage == undefined ? 0.0 : data.left_back_voltage.toFixed(2)}
+    <div class={"climberbox " + (data.left_back_voltage > 2 ? "goodgreen" : "badred")}>
+        r
+    </div>
+    FRONT RIGHT voltage:
+    <br />
+    {data.right_front_voltage == undefined ? 0 : data.right_front_voltage.toFixed(2)}
+    <div class={"climberbox " + (data.right_front_voltage > 2 ? "goodgreen" : "badred")}>
+        r
+    </div>
+    BACK RIGHT voltage:
+    <br />
+    {data.right_back_voltage == undefined ? 0.0 : data.right_back_voltage.toFixed(2)}
+    <div class={"climberbox " + (data.right_back_voltage > 2 ? "goodgreen" : "badred")}>
+        r
+    </div>
+</div>
+<div class="intakeindicator">
+    INTAKE
+    <div class={"compressorbox " + (data.intake_power > 0.0 ? "goodgreen" : "badred")}>
+    h
+    </div>
+    POWER:
+    <br />
+    {data.intake_power && data.intake_power.toFixed(2)}
+    <br />
+    ALIVE:
+    {data.intake_alive}
+</div>
+<div class="flexcenter middle">
+    RIGHT POS:
+    <br />
+    {data.right_pos && data.right_pos.toFixed(2)}
+    <br />
+    LEFT POS:
+    <br />
+    {data.left_pos && data.left_pos.toFixed(2)}
+    <br />
 </div>
 <div class="flexcenter">
     <div class="main">
         <h1>SEANBOARD</h1>
         <div class="flexcenter">
-            rust backend connection:
+            tauri backend connection:
             <div class={init ? "goodgreen" : "badred"}>
             {init ? "connected" : "disconnected"}
             </div>
+        </div>
+        <div class="flexcenter">
+            robot connection:
+            <div class={connected ? "goodgreen" : "badred"}>
+            {connected ? "connected" : "disconnected"}
+            </div>
+        </div>
+        <div class="flexcenter">
+            active:
+            <br />
+            <input type="checkbox" bind:checked={active} />
         </div>
         <div class="flexcenter">
             ip:
@@ -89,16 +178,15 @@
             }}>+</button>
         </div>
         <br />
-        {JSON.stringify(data, null, 2)}
+        <img style="transform: rotate({rotation}deg)" src="/arrow.png" alt="" />
+        <!-- {JSON.stringify(data, null, 2)} -->
     </div>
 </div>
-<!-- <input bind:value={new_ip} /> -->
-<!-- <button on:click={() => { -->
-<!--     console.log("button") -->
-<!--     appWindow.emit('set_ip', { message: new_ip }) -->
-<!-- }}>+</button> -->
 
 <style>
+    .middle {
+        top: 50vh;
+    }
     .flex {
         display: flex;
     }
@@ -108,11 +196,17 @@
     }
     .motorindicator {
         position: absolute;
+        bottom: 2vh;
+    }
+    .intakeindicator {
+        position: absolute;
+        bottom: 2vh;
+        left: 20vw;
     }
     .compressorindicator {
         position: absolute;
         right: 0px;
-        bottom: 33vh;
+        bottom: 2vh;
     }
     .compressorbox {
         width: 50px;
@@ -127,6 +221,7 @@
         width: 50vw;
     }
     .flywheelsection {
+        top: 2vh;
         position: absolute;
         font-size: 30px;
     }
@@ -138,6 +233,7 @@
         width: 200px;
         height: 100px;
         position: absolute;
+        top: 2vh;
         right: 0px;
     }
   .logo.vite:hover {

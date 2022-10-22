@@ -34,12 +34,8 @@ struct PassedData {
 
     x_speed: f64,
     z_rotation: f64,
-    // left and right distance from odemetry (meters)
-    left_distance: f64,
-    right_distance: f64,
 
     compressor_current: f64,
-    compressor_voltage: f64,
     compressor_enabled: bool,
 
     forward_solenoid: bool,
@@ -47,6 +43,7 @@ struct PassedData {
 
     intake_alive: bool,
     intake_power: f64,
+    intake_state: bool,
 
     // time in ms
     // TODO
@@ -109,13 +106,11 @@ impl PassedData {
                 gyro_turn_rate: getdouble!(v, "gyro_turn_rate"),
                 x_speed: getdouble!(v, "x_speed"),
                 z_rotation: getdouble!(v, "z_rotation"),
-                left_distance: getdouble!(v, "left_distance"),
-                right_distance: getdouble!(v, "right_distance"),
                 compressor_current: getdouble!(v, "compressor_current"),
-                compressor_voltage: getdouble!(v, "compressor_voltage"),
                 compressor_enabled: getbool!(v, "compressor_enabled"),
                 intake_alive: getbool!(v, "intake_alive"),
                 intake_power: getdouble!(v, "intake_power"),
+                intake_state: getbool!(v, "intake_state"),
                 forward_solenoid: getbool!(v, "forward_solenoid"),
                 reverse_solenoid: getbool!(v, "reverse_solenoid"),
                 unix_time: getstring!(v, "unix_time"),
@@ -141,14 +136,9 @@ fn init_process(window: Window, ip: String) {
     std::thread::spawn(move || {
         let rt  = Runtime::new().unwrap();
         rt.block_on(async {
-
-            println!("attempting to connect");
-            println!("conn established");
-            println!("attempted to connect");
             loop {
                 // Wrap the future with a `Timeout` set to expire in 10 milliseconds.
                 let t = timeout(Duration::from_millis(500), NetworkTables::connect(&(IP.lock().unwrap()), "seanboard")).await;
-                println!("iter");
                 if let Ok(t) = t {
                     let t = PassedData::get_from_table(&t);
                     std::thread::sleep(Duration::from_millis(200));
