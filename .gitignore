@@ -25,6 +25,7 @@ dist-ssr
 
 /build
 /.svelte-kit
+/frc-driver-dashboard.AppDir
 /package
 .env
 .env.*

@@ -19,6 +19,18 @@
   let flywheel_temp_f = 0.0;
   let flywheel_rpm = 0.0;
 
+  const voltage_color = (value) => {
+    if (value >= 11.5) {
+        return "goodgreen";
+    } else if (value > 8) {
+        return "midyellow";
+    } else if (value > 3) {
+        return "badred";
+    } else {
+        return "fuckcolor";
+    }
+  }
+
   onMount(async () => {
       // default ip
       appWindow.emit('set_ip', { message: '10.10.2.2:1735' })
@@ -97,7 +109,6 @@
     <br />
     {data.compressor_current == undefined ? 0.0 : data.compressor_current.toFixed(2)}
     <br />
-    COMPRESSOR VOLTAGE:
     <!-- <br /> -->
     <!-- {data.compressor_voltage == undefined ? 0.0 : data.compressor_voltage.toFixed(2)} -->
 </div>
@@ -105,31 +116,31 @@
     FRONT LEFT voltage:
     <br />
     {data.left_front_voltage == undefined ? 0.0 : data.left_front_voltage.toFixed(2)}
-    <div class={"climberbox " + (data.left_front_voltage > 2 ? "goodgreen" : "badred")}>
+    <div class={"climberbox " + voltage_color(data.left_front_voltage)}>
         r
     </div>
     BACK LEFT voltage:
     <br />
     {data.left_back_voltage == undefined ? 0.0 : data.left_back_voltage.toFixed(2)}
-    <div class={"climberbox " + (data.left_back_voltage > 2 ? "goodgreen" : "badred")}>
+    <div class={"climberbox " + voltage_color(data.left_back_voltage)}>
         r
     </div>
     FRONT RIGHT voltage:
     <br />
     {data.right_front_voltage == undefined ? 0 : data.right_front_voltage.toFixed(2)}
-    <div class={"climberbox " + (data.right_front_voltage > 2 ? "goodgreen" : "badred")}>
+    <div class={"climberbox " + voltage_color(data.right_front_voltage)}>
         r
     </div>
     BACK RIGHT voltage:
     <br />
     {data.right_back_voltage == undefined ? 0.0 : data.right_back_voltage.toFixed(2)}
-    <div class={"climberbox " + (data.right_back_voltage > 2 ? "goodgreen" : "badred")}>
+    <div class={"climberbox " + voltage_color(data.right_back_voltage)}>
         r
     </div>
 </div>
 <div class="intakeindicator">
     INTAKE
-    <div class={"compressorbox " + (data.intake_power > 0.0 ? "goodgreen" : "badred")}>
+    <div class={"compressorbox " + voltage_color(data.intake_power)}>
     h
     </div>
     POWER:
