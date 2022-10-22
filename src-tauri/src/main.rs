@@ -4,8 +4,9 @@ use tauri::{Manager, Window};
 use nt::{NetworkTables, EntryValue};
 use tokio::runtime::Runtime;
 use nt::EntryValue::{Boolean as ntBool, Double as ntDouble, String as ntString};
+use tokio::time::timeout;
+use tokio::sync::oneshot;
 
-const RUNNING: AtomicBool = AtomicBool::new(false);
 const TABLE_PREFIX: &str = "/data/";
 lazy_static::lazy_static! {
     pub static ref IP: Arc<Mutex<String>> = Arc::new(Mutex::new(String::new()));
@@ -15,6 +16,7 @@ lazy_static::lazy_static! {
 #[derive(Clone, serde::Serialize, Debug)]
 struct PassedData {
     flywheel_rpm: f64,
+    flywheel_temp: f64,
 
     left_pos: f64,
     right_pos: f64,
@@ -37,10 +39,14 @@ struct PassedData {
     right_distance: f64,
 
     compressor_current: f64,
+    compressor_voltage: f64,
     compressor_enabled: bool,
 
     forward_solenoid: bool,
     reverse_solenoid: bool,
+
+    intake_alive: bool,
+    intake_power: f64,
 
     // time in ms
     // TODO
@@ -90,9 +96,9 @@ impl PassedData {
     pub fn get_from_table(client: &Result<NetworkTables<nt::Client>, nt::error::Error>) -> Result<Self, ()> {
         if let Ok(v) = client {
             let v: HashMap<String, EntryValue> = v.entries().iter().map(|x| (x.1.name.clone(), x.1.value.clone())).collect();
-            println!("{:?}", v);
             return Ok(Self {
                 flywheel_rpm: getdouble!(v, "flywheel_rpm"),
+                flywheel_temp: getdouble!(v, "flywheel_temp"),
                 left_pos: getdouble!(v, "left_pos"),
                 right_pos: getdouble!(v, "right_pos"),
                 rotation_2d: getdouble!(v, "rotation_2d"),
@@ -106,7 +112,10 @@ impl PassedData {
                 left_distance: getdouble!(v, "left_distance"),
                 right_distance: getdouble!(v, "right_distance"),
                 compressor_current: getdouble!(v, "compressor_current"),
+                compressor_voltage: getdouble!(v, "compressor_voltage"),
                 compressor_enabled: getbool!(v, "compressor_enabled"),
+                intake_alive: getbool!(v, "intake_alive"),
+                intake_power: getdouble!(v, "intake_power"),
                 forward_solenoid: getbool!(v, "forward_solenoid"),
                 reverse_solenoid: getbool!(v, "reverse_solenoid"),
                 unix_time: getstring!(v, "unix_time"),
@@ -129,7 +138,6 @@ fn greet(name: &str) -> String {
 
 #[tauri::command]
 fn init_process(window: Window, ip: String) {
-    println!("sending init");
     std::thread::spawn(move || {
         let rt  = Runtime::new().unwrap();
         rt.block_on(async {
@@ -138,25 +146,22 @@ fn init_process(window: Window, ip: String) {
             println!("conn established");
             println!("attempted to connect");
             loop {
-                let client = NetworkTables::connect("127.0.0.1:1735", "nt-rs-client").await;
-                let t = PassedData::get_from_table(&client);
-                std::thread::sleep(Duration::from_secs(1));
-                println!("starting table fetch");
-                println!("{:?}", IP.lock().unwrap());
-                // if !RUNNING.load(std::sync::atomic::Ordering::Relaxed) {
-                //     continue;
-                // }
-                // if let Ok(v) = ip.parse() {
-                // }
-                if let Ok(v) = t {
-                    if window
-                        .emit(
-                            "new_data",
-                            v
-                        ).is_err() {
-                            break;
-                        }
+                // Wrap the future with a `Timeout` set to expire in 10 milliseconds.
+                let t = timeout(Duration::from_millis(500), NetworkTables::connect(&(IP.lock().unwrap()), "seanboard")).await;
+                println!("iter");
+                if let Ok(t) = t {
+                    let t = PassedData::get_from_table(&t);
+                    std::thread::sleep(Duration::from_millis(200));
+                    if let Ok(v) = t {
+                        if window
+                            .emit(
+                                "new_data",
+                                v
+                            ).is_err() {
+                                break;
+                            }
                     }
+                }
             }
         });
     });
@@ -179,7 +184,6 @@ fn main() {
                         println!("{:?}", v);
                     }
                 }
-                RUNNING.swap(true, std::sync::atomic::Ordering::Relaxed);
             });
             // unlisten to the event using the `id` returned on the `listen` function
             // an `once` API is also exposed on the `Window` struct

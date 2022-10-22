@@ -5,22 +5,17 @@
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/tauri";
 
-  const ip = writable("");
   const webview = new WebviewWindow('main')
   let new_ip = "";
   let init = false;
   let data = "";
 
-  let flywheelcolor = "goodgreen";
+  let flywheelcolor = "badred";
   let flywheel_rpm = 0;
 
   onMount(async () => {
-      appWindow.emit('set_ip', { message: '127.0.0.1' })
-      ip.subscribe(d => {
-        webview.emit('set_ip', {
-            message: d,
-        })
-      })
+      // default ip
+      appWindow.emit('set_ip', { message: '10.10.2.2:1735' })
       appWindow.listen('new_data', (e) => {
         data = e.payload;
         const rpm = data.flywheel_rpm;
@@ -50,23 +45,10 @@
   // emits the `click` event with the object payload
 </script>
 
-<div class="flexcenter">
-    <div class="main">
-        <h1>SEANBOARD</h1>
-        <div class="flexcenter">
-            backend connection:
-            <div class={init ? "goodgreen" : "badred"}>
-            {init ? "connected" : "disconnected"}
-            </div>
-        </div>
-        <br />
-        {JSON.stringify(data, null, 2)}
-    </div>
-</div>
 <br />
 
 <div class="flywheelsection">
-    RPM: {flywheel_rpm == 0 ? "0 BAD BAD" : flywheel_rpm}
+    RPM: {flywheel_rpm <= 0 ? flywheel_rpm + " BAD BAD" : flywheel_rpm}
     <div class={"flywheelindicator " + flywheelcolor} />
 </div>
 
@@ -74,12 +56,12 @@
     FORWARD SOLENOID
     <br />
     <div class={"climberbox " + (data.forward_solenoid ? "goodgreen" : "badred")}>
-        foward
+        f
     </div>
     REVERSE SOLENOID
     <br />
     <div class={"climberbox " + (data.reverse_solenoid ? "goodgreen" : "badred")}>
-        reverse
+        r
     </div>
 </div>
 <div class="compressorindicator">
@@ -87,7 +69,28 @@
     <div class={"compressorbox " + (data.compressor_enabled ? "goodgreen" : "badred")}>
     h
     </div>
-    COMPRESSOR CURRENT: {data.compressor_current}
+    COMPRESSOR CURRENT: {data.compressor_current == undefined ? 0 : data.compressor_current}
+</div>
+<div class="flexcenter">
+    <div class="main">
+        <h1>SEANBOARD</h1>
+        <div class="flexcenter">
+            rust backend connection:
+            <div class={init ? "goodgreen" : "badred"}>
+            {init ? "connected" : "disconnected"}
+            </div>
+        </div>
+        <div class="flexcenter">
+            ip:
+            <input bind:value={new_ip}/>
+            <button on:click={() => {
+                appWindow.emit('set_ip', { message: `${new_ip}:1735`})
+                new_ip = "";
+            }}>+</button>
+        </div>
+        <br />
+        {JSON.stringify(data, null, 2)}
+    </div>
 </div>
 <!-- <input bind:value={new_ip} /> -->
 <!-- <button on:click={() => { -->
@@ -103,10 +106,13 @@
         width: 50px;
         height: 50px;
     }
+    .motorindicator {
+        position: absolute;
+    }
     .compressorindicator {
         position: absolute;
         right: 0px;
-        bottom: 0px;
+        bottom: 33vh;
     }
     .compressorbox {
         width: 50px;
